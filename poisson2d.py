@@ -32,29 +32,54 @@ class Poisson2D:
 
     def create_mesh(self, N):
         """Create 2D mesh and store in self.xij and self.yij"""
-        # self.xij, self.yij ...
-        raise NotImplementedError
+        x = np.linspace(0, self.L, N+1)
+        y = np.linspace(0, self.L, N+1)
+        self.dx = x[1] - x[0]                   # Grid spacing
+        self.dy = self.dx
+        self.h = self.dx
+        self.xij, self.yij = np.meshgrid(x,y)   # Stores the mesh in class
+        
 
     def D2(self):
         """Return second order differentiation matrix"""
-        raise NotImplementedError
+        D = sparse.diags([1, -2, 1], [-1, 0, 1], (self.N+1, self.N+1), 'lil')
+        D[0, :4] = 2, -5, 4, -1
+        D[-1, -4:] = -1, 4, -5, 2
+        return D
+        
 
     def laplace(self):
         """Return vectorized Laplace operator"""
-        raise NotImplementedError
+        D2x = (1 / self.dx**2) * self.D2()
+        D2y = (1 / self.dy**2) * self.D2()
+        return (sparse.kron(D2x, sparse.eye(self.N+1)) + 
+                    sparse.kron(sparse.eye(self.N+1), D2y))
 
     def get_boundary_indices(self):
         """Return indices of vectorized matrix that belongs to the boundary"""
-        raise NotImplementedError
+        B = np.ones((self.N+1, self.N+1))
+        B[1:-1, 1:-1] = 0
+        self.boundary_indices = np.where(B.ravel() == 1)[0]
+        
 
     def assemble(self):
         """Return assembled matrix A and right hand side vector b"""
-        # return A, b
-        raise NotImplementedError
+        self.get_boundary_indices()    
+        A = self.laplace()
+        for i in self.boundary_indices:
+            A[i] = 0
+            A[i, i] = 1
+        # A = A.tocsr()
+        self.F = sp.lambdify((x,y), self.f)(self.xij, self.yij)
+        b = self.F.ravel()
+        b[self.boundary_indices] = 0            # boundary conditions
+
+        return A, b
 
     def l2_error(self, u):
         """Return l2-error norm"""
-        raise NotImplementedError
+        l2error = np.sqrt(self.dx * self.dy * sum(u - sp.lambdify((x,y), self.ue)(self.xij, self.yij)))
+        return l2error
 
     def __call__(self, N):
         """Solve Poisson's equation.
@@ -70,6 +95,7 @@ class Poisson2D:
 
         """
         self.create_mesh(N)
+        self.N = N
         A, b = self.assemble()
         self.U = sparse.linalg.spsolve(A, b.flatten()).reshape((N+1, N+1))
         return self.U
@@ -106,7 +132,7 @@ class Poisson2D:
         Parameters
         ----------
         x, y : numbers
-            The coordinates for evaluation
+            The coordinates for evaluation by interpolation
 
         Returns
         -------
@@ -129,3 +155,7 @@ def test_interpolation():
     assert abs(sol.eval(0.52, 0.63) - ue.subs({x: 0.52, y: 0.63}).n()) < 1e-3
     assert abs(sol.eval(sol.h/2, 1-sol.h/2) - ue.subs({x: sol.h, y: 1-sol.h/2}).n()) < 1e-3
 
+if __name__ == "__main__":
+    # test_convergence_poisson2d()
+    # test_interpolation
+    pass
