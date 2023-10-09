@@ -37,7 +37,7 @@ class Poisson2D:
         self.dx = x[1] - x[0]                   # Grid spacing
         self.dy = self.dx
         self.h = self.dx
-        self.xij, self.yij = np.meshgrid(x,y)   # Stores the mesh in class
+        self.xij, self.yij = np.meshgrid(x,y, indexing="ij")   # Stores the mesh in class
         
 
     def D2(self):
@@ -65,20 +65,22 @@ class Poisson2D:
     def assemble(self):
         """Return assembled matrix A and right hand side vector b"""
         self.get_boundary_indices()    
-        A = self.laplace()
+        A = self.laplace().tolil()
         for i in self.boundary_indices:
             A[i] = 0
             A[i, i] = 1
         # A = A.tocsr()
         self.F = sp.lambdify((x,y), self.f)(self.xij, self.yij)
         b = self.F.ravel()
-        b[self.boundary_indices] = 0            # boundary conditions
+        self.u_exact = sp.lambdify((x,y), self.ue)(self.xij, self.yij)
+        b[self.boundary_indices] = self.u_exact.ravel()[self.boundary_indices]            # boundary conditions
 
         return A, b
 
     def l2_error(self, u):
         """Return l2-error norm"""
-        l2error = np.sqrt(self.dx * self.dy * sum(u - sp.lambdify((x,y), self.ue)(self.xij, self.yij)))
+        
+        l2error = np.sqrt(self.dx * self.dy * np.sum((u - self.u_exact) ** 2))
         return l2error
 
     def __call__(self, N):
@@ -97,7 +99,7 @@ class Poisson2D:
         self.create_mesh(N)
         self.N = N
         A, b = self.assemble()
-        self.U = sparse.linalg.spsolve(A, b.flatten()).reshape((N+1, N+1))
+        self.U = sparse.linalg.spsolve(A.tocsr(), b.flatten()).reshape((N+1, N+1))
         return self.U
 
     def convergence_rates(self, m=6):
@@ -123,6 +125,7 @@ class Poisson2D:
             E.append(self.l2_error(u))
             h.append(self.h)
             N0 *= 2
+        
         r = [np.log(E[i-1]/E[i])/np.log(h[i-1]/h[i]) for i in range(1, m+1, 1)]
         return r, np.array(E), np.array(h)
 
@@ -156,6 +159,6 @@ def test_interpolation():
     assert abs(sol.eval(sol.h/2, 1-sol.h/2) - ue.subs({x: sol.h, y: 1-sol.h/2}).n()) < 1e-3
 
 if __name__ == "__main__":
-    # test_convergence_poisson2d()
+    test_convergence_poisson2d()
     # test_interpolation
     pass
