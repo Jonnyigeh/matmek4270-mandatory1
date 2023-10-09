@@ -10,17 +10,25 @@ class Wave2D:
 
     def create_mesh(self, N, sparse=False):
         """Create 2D mesh and store in self.xij and self.yij"""
-        # self.xji, self.yij = ...
-        raise NotImplementedError
+        x = np.linspace(0, 1, N + 1)
+        y = np.linspace(0, 1, N + 1)
+        self.xij, self.yij = np.meshgrid(x, y, indexing="ij", sparse=sparse)
+        self.dx = x[1] - x[0]
+        self.dy = self.dx
+        
 
     def D2(self, N):
         """Return second order differentiation matrix"""
-        raise NotImplementedError
+        D = sparse.diags([1, -2, 1], [-1, 0, 1], (N+1, N+1), 'lil')
+        D[0, :4] = 2, -5, 4, -1
+        D[-1, -4:] = -1, 4, -5, 2
+
+        return D
 
     @property
     def w(self):
         """Return the dispersion coefficient"""
-        raise NotImplementedError
+        return self.c * sp.pi * sp.sqrt(self.mx ** 2 + self.my ** 2)         # Found using the dispersion relation
 
     def ue(self, mx, my):
         """Return the exact standing wave"""
@@ -36,12 +44,17 @@ class Wave2D:
         mx, my : int
             Parameters for the standing wave
         """
-        raise NotImplementedError
+        self.Unp1, self.Un, self.Unm1 = np.zeros((3, N+1, N+1))
+        self.u_exact = sp.lambdify((x,y,t), self.ue(self.mx, self.my))
+
+        self.Unm1[:] = self.u_exact(self.xij, self.yij, 0)
+        self.Un[:] = self.Unm1 + 0.5 * (self.c * self.dt) **2 * (self.D @ self.Unm1 + self.Unm1 @ self.D.T)
+
 
     @property
     def dt(self):
         """Return the time step"""
-        raise NotImplementedError
+        return self.cfl * self.dx / self.c
 
     def l2_error(self, u, t0):
         """Return l2-error norm
@@ -53,10 +66,19 @@ class Wave2D:
         t0 : number
             The time of the comparison
         """
-        raise NotImplementedError
+        
+        uexact = self.u_exact(self.xij, self.yij, t0)
+        l2error = np.sqrt(self.dx * self.dy * np.sum((u - uexact) ** 2))
+
+        return l2error
+        
 
     def apply_bcs(self):
-        raise NotImplementedError
+        """Applies Dirichlet boundary conditions (i.e 0 at the entire boundary)"""
+        self.Unp1[0] = 0
+        self.Unp1[-1] = 0
+        self.Unp1[:, -1] = 0
+        self.Unp1[:, 0] = 0
 
     def __call__(self, N, Nt, cfl=0.5, c=1.0, mx=3, my=3, store_data=-1):
         """Solve the wave equation
@@ -83,7 +105,34 @@ class Wave2D:
         If store_data > 0, then return a dictionary with key, value = timestep, solution
         If store_data == -1, then return the two-tuple (h, l2-error)
         """
-        raise NotImplementedError
+        self.c = c
+        self.cfl = cfl
+        self.mx, self.my = mx, my
+        
+
+        self.create_mesh(N)
+        self.D = self.D2(N=N) / self.dx ** 2
+        self.initialize(N, mx, my)
+        
+        
+        plotdata = {}
+        l2error = []
+        l2error.append(self.l2_error(self.Un, self.dt))         # Evaluated at time = dt which is one timestep into the solution.
+       
+        for i in range(1, Nt):
+            self.Unp1[:] = 2 * self.Un - self.Unm1 + (self.c * self.dt) **2 * (self.D @ self.Un + self.Un @ self.D.T)
+            self.apply_bcs()
+
+            self.Unm1[:] = self.Un
+            self.Un[:] = self.Unp1
+            if i % store_data == 0:
+                plotdata[i * self.dt] = self.Unm1.copy()        # Nødvendig å gange med self.dt her? Sjekk m convergence rate function
+            l2error.append(self.l2_error(self.Un, (i+1) * self.dt)) # Add one timestep since Un is in reality Unp1
+        if store_data == -1:
+            return (self.dx, l2error[:])
+        
+        return plotdata
+
 
     def convergence_rates(self, m=4, cfl=0.1, Nt=10, mx=3, my=3):
         """Compute convergence rates for a range of discretizations
@@ -116,6 +165,7 @@ class Wave2D:
             N0 *= 2
             Nt *= 2
         r = [np.log(E[i-1]/E[i])/np.log(h[i-1]/h[i]) for i in range(1, m+1, 1)]
+        
         return r, np.array(E), np.array(h)
 
 class Wave2D_Neumann(Wave2D):
@@ -124,7 +174,7 @@ class Wave2D_Neumann(Wave2D):
         raise NotImplementedError
 
     def ue(self, mx, my):
-        raise NotImplementedError
+        return sp.cos( mx * sp.pi * x) * sp.cos( my * sp.pi * y) * sp.cos(self.w * t) # Eq. 1.5 in assignment
 
     def apply_bcs(self):
         raise NotImplementedError
@@ -141,3 +191,14 @@ def test_convergence_wave2d_neumann():
 
 def test_exact_wave2d():
     raise NotImplementedError
+
+
+
+
+
+if __name__ == "__main__":
+    test_convergence_wave2d()
+    # test_exact_wave2d()
+    # test_convergence_wave2d_neumann()
+
+    pass
