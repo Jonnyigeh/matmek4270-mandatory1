@@ -28,7 +28,7 @@ class Poisson2D:
         """
         self.L = L
         self.ue = ue
-        self.f = sp.diff(self.ue, x, 2)+sp.diff(self.ue, y, 2)
+        self.f = sp.diff(self.ue, x, 2) + sp.diff(self.ue, y, 2)
 
     def create_mesh(self, N):
         """Create 2D mesh and store in self.xij and self.yij"""
@@ -135,14 +135,30 @@ class Poisson2D:
         Parameters
         ----------
         x, y : numbers
-            The coordinates for evaluation by interpolation
+            The coordinates for evaluation by 4 point (bilinear) interpolation
 
         Returns
         -------
         The value of u(x, y)
 
         """
-        raise NotImplementedError
+
+        nx = int(x // self.dx)         # Index of nearest gridpoint to x
+        ny = int(y // self.dy)
+        spacing_x = (x - nx * self.dx) / self.h
+        spacing_y = (y - ny * self.dy) / self.h
+
+        w1 = (1 - spacing_x) * (1 - spacing_y)
+        w2 = (1 - spacing_y) * spacing_x
+        w3 = (1 - spacing_x) * spacing_y
+        w4 = spacing_x * spacing_y
+
+        evaluation = ( w1 * self.U[nx, ny] + w2 * self.U[nx + 1, ny]
+                        + w3 * self.U[nx, ny + 1] + w4 * self.U[nx +1, ny + 1]    
+        )
+        return evaluation
+    
+        
 
 def test_convergence_poisson2d():
     # This exact solution is NOT zero on the entire boundary
@@ -160,5 +176,5 @@ def test_interpolation():
 
 if __name__ == "__main__":
     test_convergence_poisson2d()
-    # test_interpolation
-    pass
+    test_interpolation
+    
