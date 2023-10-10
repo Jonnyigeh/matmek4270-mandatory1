@@ -126,12 +126,12 @@ class Wave2D:
             self.Unm1[:] = self.Un
             self.Un[:] = self.Unp1
             if i % store_data == 0:
-                plotdata[i * self.dt] = self.Unm1.copy()        # Nødvendig å gange med self.dt her? Sjekk m convergence rate function
+                plotdata[i] = self.Unm1.copy()        # Nødvendig å gange med self.dt her? Sjekk m convergence rate function
             l2error.append(self.l2_error(self.Un, (i+1) * self.dt)) # Add one timestep since Un is in reality Unp1
         if store_data == -1:
             return (self.dx, l2error[:])
         
-        return plotdata
+        return self.xij, self.yij, plotdata
 
 
     def convergence_rates(self, m=4, cfl=0.1, Nt=10, mx=3, my=3):
@@ -212,4 +212,24 @@ if __name__ == "__main__":
     test_convergence_wave2d()
     test_convergence_wave2d_neumann()
     test_exact_wave2d()
+    
+    create_movie = True
+    if create_movie:
+        import matplotlib.animation as animation
+    
+        sol = Wave2D_Neumann()
+        m = 2
+        cfl = 1 / np.sqrt(2)
+        xij, yij, plotdata = sol(N=100, Nt=50, cfl=cfl, mx=m, my=m, store_data=1)
+
+        
+        fig, ax = plt.subplots(subplot_kw={"projection": "3d"})
+        frames = []
+        for n, val in plotdata.items():
+            frame = ax.plot_wireframe(xij, yij, val, rstride=2, cstride=2)
+            frames.append([frame])
+        
+        
+        ani = animation.ArtistAnimation(fig, frames, interval=400, blit=True, repeat_delay=1000)
+        ani.save("report/wavemovie2d_neumann.gif", writer="pillow", fps=5)
     pass
