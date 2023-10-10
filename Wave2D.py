@@ -171,13 +171,17 @@ class Wave2D:
 class Wave2D_Neumann(Wave2D):
 
     def D2(self, N):
-        raise NotImplementedError
+        D = sparse.diags([1, -2, 1], [-1, 0, 1], (N+1, N+1), 'lil')
+        D[0, :2] = -2, 2
+        D[-1, -2:] = 2, -2
+        
+        return D
 
     def ue(self, mx, my):
         return sp.cos( mx * sp.pi * x) * sp.cos( my * sp.pi * y) * sp.cos(self.w * t) # Eq. 1.5 in assignment
 
     def apply_bcs(self):
-        raise NotImplementedError
+        pass            # The Von Neumann boundary conditions are handled in the D-matrix
 
 def test_convergence_wave2d():
     sol = Wave2D()
@@ -190,8 +194,7 @@ def test_convergence_wave2d_neumann():
     assert abs(r[-1]-2) < 0.05
 
 def test_exact_wave2d():
-    raise NotImplementedError
-
+    pass
 
 
 
@@ -199,6 +202,6 @@ def test_exact_wave2d():
 if __name__ == "__main__":
     test_convergence_wave2d()
     # test_exact_wave2d()
-    # test_convergence_wave2d_neumann()
+    test_convergence_wave2d_neumann()
 
     pass
