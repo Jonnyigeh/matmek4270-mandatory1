@@ -4,5 +4,4 @@
 
 In this mandatory assignment, we've solved two-dimensional differential equations using finite difference methods.
 The solution of the wave equation in 2D is presented in videoform in the following .gif:
-![]
-(https://github.com/Jonnyigeh/matmek4270-mandatory1/blob/main/report/wavemovie2d_neumann.gif)
+![](https://github.com/Jonnyigeh/matmek4270-mandatory1/blob/main/report/wavemovie2d_neumann.gif)
